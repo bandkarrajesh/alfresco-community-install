@@ -1,0 +1,11 @@
+systemctl start activemq
+systemctl start solr
+/usr/local/alfresco-community70/localTransformationService.sh start
+/usr/local/alfresco-community70/tomcat/bin/catalina.sh start
+
+Stop services: 
+
+/usr/local/alfresco-community70/tomcat/bin/catalina.sh stop
+/usr/local/alfresco-community70/localTransformationService.sh stop
+systemctl stop solr
+systemctl stop activemq

@@ -1,0 +1,333 @@
+User and Group for Alfresco Content Services (ACS):
+
+sudo groupadd Alfresco
+sudo adduser alfresco --system
+sudo usermod -a -G Alfresco alfresco
+sudo groups alfresco
+
+sudo groupadd Solr
+sudo adduser solr --system
+sudo usermod -a -G Solr solr
+sudo groups solr
+
+sudo mkdir /opt/alfresco
+sudo mkdir -p /opt/alfresco/activemq
+sudo mkdir -p /opt/alfresco/alf_data/keystore
+sudo mkdir -p /opt/alfresco/alfresco-pdf-renderer
+sudo mkdir -p /opt/alfresco/amps
+sudo mkdir -p /opt/alfresco/amps_share
+sudo mkdir -p /opt/alfresco/bin
+sudo mkdir -p /opt/alfresco/imagemagick
+sudo mkdir -p /opt/alfresco/libreoffice
+sudo mkdir -p /opt/alfresco/licenses
+sudo mkdir -p /opt/alfresco/modules/platform
+sudo mkdir -p /opt/alfresco/modules/share
+sudo mkdir -p /opt/alfresco/tomcat/shared/classes
+sudo mkdir -p /opt/alfresco/tomcat/shared/lib
+
+sudo chgrp -R /opt/alfresco
+sudo chmod 775 /opt/alfresco
+sudo chmod -R /opt/alfresco/alf_data
+
+sudo yum update -y
+sudo reboot
+sudo yum install java-11-openjdk-devel
+sudo java -version
+sudo alternatives --config java
+
+sudo vim .bash_profile
+
+export JAVA_HOME=/usr/lib/jvm/java-11
+export ALF_HOME=/opt/alfresco
+export SOLR_HOME=/opt/alfresco-search-services
+export PATH=$PATH:$HOME/.local/bin:$HOME/bin:$ALF_HOME:$SOLR_HOME
+
+sudo su - postgres
+psql
+create role alfresco LOGIN password 'alfresco';
+create database alfresco encoding 'utf8';
+grant all on database alfresco to alfresco;
+exit
+exit
+
+sudo wget https://archive.apache.org/dist/activemq/5.16.3/apache-activemq-5.16.3-bin.tar.gz
+sudo tar -xvf /root/apache-activemq-5.16.2-bin.tar.gz
+sudo cp -R /root/Downloads/apache-activemq-5.16.2/* /opt/alfresco/activemq/
+sudo vim /etc/systemd/system/activemq.service
+[Unit]
+Description=ActiveMQ service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/opt/alfresco/activemq/bin/activemq start
+ExecStop=/opt/alfresco/activemq/bin/activemq stop
+User=alfresco
+Group=Alfresco
+WorkingDirectory=~/opt/alfresco/activemq/data
+Restart=always
+RestartSec=9
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=activemq
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo chgrp -R Alfresco /opt/alfresco/activemq
+sudo chown -R alfresco:Alfresco /opt/alfresco/activemq/data
+sudo systemctl start activemq
+sudo systemctl enable activemq
+sudo systemctl status activemq
+
+sudo firewall-cmd --zone=public --permanent --add-port=8161/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=5672/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=61616/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=61613/tcp
+sudo firewall-cmd --reload
+
+
+sudo semanage port -a -t http_port_t -p tcp 8161
+
+
+sudo mkdir /opt/alfresco/activemq/tmp
+sudo chgrp -R Alfresco /opt/alfresco/activemq/tmp
+sudo chmod -R 775 /opt/alfresco/activemq/tmp
+
+wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.58/bin/apache-tomcat-9.0.58.tar.gz
+sudo tar -xvf /root/apache-tomcat-9.0.58.tar.gz
+sudo cp -R /root/apache-tomcat-9.0.58/* /opt/alfresco/tomcat/
+
+sudo chgrp -R Alfresco /opt/alfresco
+sudo chmod -R 755 /opt/alfresco/tomcat/bin
+sudo chmod -R 755 /opt/alfresco/tomcat/conf
+sudo chmod -R 755 /opt/alfresco/tomcat/shared
+sudo chmod -R 755 /opt/alfresco/tomcat/lib
+sudo chmod -R 775 /opt/alfresco/tomcat/temp
+sudo chmod -R 775 /opt/alfresco/tomcat/logs
+sudo chmod -R 775 /opt/alfresco/tomcat/work
+sudo chmod -R 775 /opt/alfresco/tomcat/webapps
+
+sudo vim /etc/systemd/system/tomcat.service
+
+#Systemd unit file for tomcat
+[Unit]
+Description=Apache Tomcat Web Application Container
+After=syslog.target network.target
+
+[Service]
+Type=forking
+Restart=always
+
+Environment=JAVA_HOME=/usr/lib/jvm/jre
+Environment=CATALINA_PID=/opt/alfresco/tomcat/temp/tomcat.pid
+Environment=CATALINA_HOME=/opt/alfresco/tomcat
+Environment=CATALINA_BASE=/opt/alfresco/tomcat
+Environment='CATALINA_OPTS=-Xms3G -Xmx4G -Xss1024k -server -XX:+UseParallelGC'
+Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom'
+
+ExecStart=/opt/alfresco/tomcat/bin/startup.sh
+ExecStop=/bin/kill -15 $MAINPID
+WorkingDirectory=/opt/alfresco/tomcat
+User=alfresco
+Group=Alfresco
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl start tomcat
+sudo systemctl enable tomcat
+sudo systemctl status tomcat
+
+sudo firewall-cmd --zone=public --permanent --add-port=8080/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=8443/tcp
+sudo firewall-cmd --reload
+
+sudo unzip /root/alfresco-content-services-community-distribution-7.0.0.zip -d /root/alfresco-content-services-community-distribution-7.0.0
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/keystore/CreateSSLKeystores.txt /opt/alfresco/alf_data/keystore/
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/keystore/generate_keystores.sh /opt/alfresco/alf_data/keystore/
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/keystore/readme.txt /opt/alfresco/alf_data/keystore/
+
+sudo chgrp -R Alfresco /opt/alfresco/alf_data/keystore
+sudo chmod -R 755 /opt/alfresco/alf_data/keystore
+
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/amps/alfresco-share-services.amp /opt/alfresco/amps/
+
+sudo chgrp -R Alfresco /opt/alfresco/amps 
+sudo chgrp -R Alfresco /opt/alfresco/amps_share
+sudo chmod -R 755 /opt/alfresco/amps 
+sudo chmod -R 755 /opt/alfresco/amps_share
+
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/bin/alfresco-mmt.jar /opt/alfresco/bin/
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/bin/apply_amps.sh /opt/alfresco/bin/
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/bin/clean_tomcat.sh /opt/alfresco/bin/
+
+sudo chgrp -R Alfresco /opt/alfresco/bin
+sudo chmod -R 755 /opt/alfresco/bin
+
+sudo cp -R /root/alfresco-content-services-community-distribution-7.0.0/licenses/* /opt/alfresco/licenses/
+
+sudo chgrp -R Alfresco /opt/alfresco/licenses
+sudo cp -R /root/alfresco-content-services-community-distribution-7.0.0/web-server/conf/* /opt/alfresco/tomcat/conf/
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/web-server/lib/* /opt/alfresco/tomcat/lib/
+
+sudo chgrp -R Alfresco /opt/alfresco/tomcat/lib
+sudo chmod 755 /opt/alfresco/tomcat/lib/*.jar
+
+sudo cp -R /root/alfresco-content-services-community-distribution-7.0.0/web-server/shared/classes /opt/alfresco/tomcat/shared/classes/
+
+sudo mkdir /opt/alfresco/tomcat/shared/classes/alfresco/extension/keystore
+sudo cp -R /root/alfresco-content-services-community-distribution-7.0.0/keystore/metadata-keystore /opt/alfresco/tomcat/shared/classes/alfresco/extension/keystore
+
+sudo chgrp -R Alfresco /opt/alfresco/tomcat/shared
+sudo chmod -R 755 /opt/alfresco/tomcat/shared
+
+sudo rm -rf /opt/alfresco/tomcat/webapps/*
+
+sudo cp /root/alfresco-content-services-community-distribution-7.0.0/web-server/webapps/*.war /opt/alfresco/tomcat/webapps/
+
+sudo chgrp -R Alfresco /opt/alfresco/tomcat/webapps/
+sudo chmod -R 775 /opt/alfresco/tomcat/webapps/*.war
+
+sudo rm -rf /opt/alfresco/tomcat/work/Catalina/localhost/*
+
+sudo chgrp -R Alfresco /opt/alfresco/tomcat/work/Catalina/localhost
+sudo chmod -R 775 /opt/alfresco/tomcat/work/Catalina/localhost
+
+sudo vim /opt/alfresco/tomcat/conf/server.xml
+
+<Connector port="8080" protocol="HTTP/1.1"
+ URIEncoding="UTF-8" connectionTimeout="20000"
+ maxHttpHeaderSize="32768"
+ redirectPort="8443" />
+
+sudo vim /opt/alfresco/tomcat/conf/catalina.properties
+
+shared.loader=${catalina.base}/shared/classes,${catalina.base}/shared/lib/*.jar
+
+sudo vim /opt/alfresco/tomcat/bin/catalina.sh 
+
+#ACS7 Custom changes [Start] ##############
+export JAVA_TOOL_OPTIONS="-Dencryption.keystore.type=JCEKS -Dencryption.cipherAlgorithm=DESede/CBC/PKCS5Padding -Dencryption.keyAlgorithm=DESede -Dencryption.keystore.location=/usr/local/alfresco-community70/tomcat/shared/classes/alfresco/extension/keystore/metadata-keystore/keystore -Dmetadata-keystore.password=mp6yc0UD9e -Dmetadata-keystore.aliases=metadata -Dmetadata-keystore.metadata.password=oKIWzVdEdA -Dmetadata-keystore.metadata.algorithm=DESede"
+#ACS7 Custom changes [End] ##############
+
+sudo mv /opt/alfresco/tomcat/shared/classes/alfresco-global.properties.sample /opt/alfresco/tomcat/shared/classes/alfresco-global.properties
+
+sudo chgrp Alfresco /opt/alfresco/tomcat/shared/classes/alfresco-global.properties
+sudo chmod 775 /opt/alfresco/tomcat/shared/classes/alfresco-global.properties
+
+sudo vim alfresco-global.properties
+
+###############################
+## Common Alfresco Properties #
+###############################
+
+
+dir.root=/usr/local/alfresco-community70/alf_data
+dir.contentstore=${dir.root}/contentstore
+dir.contentstore.deleted=${dir.root}/contentstore.deleted
+dir.keystore=/usr/local/alfresco-community70/tomcat/shared/classes/alfresco/extension/keystore
+
+
+
+#
+# URL Generation Parameters (The ${localname} token is replaced by the local server name)
+#-------------
+alfresco.context=alfresco
+alfresco.host=${localname}
+alfresco.port=8080
+alfresco.protocol=http
+share.context=share
+share.host=${localname}
+share.port=8080
+share.protocol=http
+
+### database connection properties ###
+db.driver=org.postgresql.Driver
+db.username=alfresco
+db.password=alfresco
+db.name=alfresco
+db.url=jdbc:postgresql://localhost:5432/${db.name}
+# Note: your database must also be able to accept at least this many connections.  Please see your database documentation for instructions on how to configure this.
+db.pool.max=275
+db.pool.validate.query=SELECT 1
+
+# The server mode. Set value here
+# UNKNOWN | TEST | BACKUP | PRODUCTION
+system.serverMode=UNKNOWN
+
+### RMI registry port for JMX ###
+alfresco.rmi.services.port=50500
+
+# Default value of alfresco.rmi.services.host is 0.0.0.0 which means 'listen on all adapters'.
+# This allows connections to JMX both remotely and locally.
+alfresco.rmi.services.host=0.0.0.0
+
+#
+#
+# Assign individual ports for each service for best performance 
+# or run several services on the same port. You can even run everything on 50500 if needed.
+# Select 0 to use a random unused port.
+#monitor.rmi.service.port=50508
+
+
+### E-mail site invitation setting ###
+notification.email.siteinvite=false
+
+### License location ###
+dir.license.external=/usr/local/alfresco-community70
+
+### Allow extended ResultSet processing
+security.anyDenyDenies=false
+
+### Smart Folders Config Properties ###
+smart.folders.enabled=false
+
+### Remote JMX (Default: disabled) ###
+alfresco.jmx.connector.enabled=false
+
+## AMQ And Transformation services
+localTransform.core-aio.url=http://localhost:8090/
+local.transform.service.enabled=true
+messaging.broker.url=tcp://localhost:61616
+messaging.subsystem.autoStart=true
+#If you have setup username and password for AMQ, then set the below properties. In my case i have kept default admin/admin
+messaging.broker.username=admin
+messaging.broker.password=admin
+
+################ Solr Search service configurations ###############
+
+#
+# Index Recovery Mode
+#-------------
+#index.recovery.mode=AUTO
+
+# Set this property unless you have explicitly chosen to expose some repository APIs without authentication
+solr.host=localhost
+solr.port=8983
+#none, https
+solr.secureComms=none
+solr.base.url=/solr
+index.subsystem.name=solr6
+
+
+### FTP Server Configuration ###
+ftp.port=2121
+ftp.enabled=true
+ftp.server.enables=true
+
+sudo yum update -y
+sudo reboot
+sudo yum localinstall /root/Imagemagick7/*.rpm -y
+sudo ln -s /usr/bin/convert /opt/alfresco/imagemagick
+sudo ln -s /usr/lib64/ImageMagick-7.0.10/config-Q16HDRI /opt/alfresco/imagemagick
+sudo ln -s /usr/lib64/ImageMagick-7.0.10/modules-Q16HDRI /opt/alfresco/imagemagick
+
+sudo yum localinstall /root/LibreOffice_6.3.5.2_Linux_x86-64_rpm/RPMS/*.rpm -y
+sudo ln -s /opt/libreoffice6.3/* /opt/alfresco/libreoffice
+
+sudo tar -xvf /home/centos/Downloads/alfresco-pdf-renderer-1.1-linux.tgz --directory /home/centos/Downloads/
+
+sudo cp /home/centos/Downloads/alfresco-pdf-renderer /usr/local/alfresco-community70/alfresco-pdf-renderer/

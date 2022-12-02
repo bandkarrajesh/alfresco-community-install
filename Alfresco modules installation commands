@@ -1,0 +1,19 @@
+List installed Modules:
+
+cd /usr/local/alfresco-community70/bin/
+java -jar alfresco-mmt.jar list /usr/local/alfresco-community70/tomcat/webapps/alfresco.war
+java -jar alfresco-mmt.jar list /usr/local/alfresco-community70/tomcat/webapps/share.war
+
+Install New Modules:
+
+cp /home/ec2-user/uploader-plus-repo-1.6.amp /usr/local/alfresco-community70/amps
+cp /home/ec2-user/uploader-plus-surf-1.6.amp /usr/local/alfresco-community70/amps_share/
+cd /usr/local/alfresco-community70/bin/
+java -jar alfresco-mmt.jar install ../amps/uploader-plus-repo-1.6.amp /usr/local/alfresco-community70/tomcat/webapps/alfresco.war
+java -jar alfresco-mmt.jar install ../amps_share/uploader-plus-surf-1.6.amp /usr/local/alfresco-community70/tomcat/webapps/share.war
+
+Uninstall Modules:
+
+cd /usr/local/alfresco-community70/bin/
+java -jar alfresco-mmt.jar uninstall uploader-plus-repo /usr/local/alfresco-community70/tomcat/webapps/alfresco.war
+java -jar alfresco-mmt.jar uninstall uploader-plus-surf /usr/local/alfresco-community70/tomcat/webapps/share.war
